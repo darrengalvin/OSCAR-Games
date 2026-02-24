@@ -140,25 +140,23 @@ class ShootingTarget {
     // Level 1 = 30px, level 50 = 10px
     final targetRadius = (30.0 - (level - 1) * 0.41).clamp(10.0, 30.0);
 
-    // Speed ramps up more gradually over 50 levels
-    // Level 1 = 0.4, level 10 = 1.2, level 50 = 5.0
+    // All targets move from level 1, speed increases with level
+    // Level 1 = 0.5 (slow drift), level 50 = 5.0
     final baseSpeed = level <= 5
-        ? 0.4 + (level - 1) * 0.15
+        ? 0.5 + (level - 1) * 0.15
         : level <= 15
-            ? 0.8 + (level - 5) * 0.12
+            ? 1.0 + (level - 5) * 0.15
             : level <= 30
-                ? 2.0 + (level - 15) * 0.15
-                : 4.0 + (level - 30) * 0.05;
+                ? 2.5 + (level - 15) * 0.15
+                : 4.5 + (level - 30) * 0.03;
 
-    // Movement patterns unlock gradually
+    // Movement patterns - always moving, complexity increases
     final patterns = <MovePattern>[];
-    if (level <= 3) {
-      patterns.add(MovePattern.stationary);
-    } else if (level <= 8) {
-      patterns.addAll([MovePattern.stationary, MovePattern.linear]);
-    } else if (level <= 15) {
+    if (level <= 5) {
+      patterns.add(MovePattern.linear);
+    } else if (level <= 12) {
       patterns.addAll([MovePattern.linear, MovePattern.zigzag]);
-    } else if (level <= 30) {
+    } else if (level <= 25) {
       patterns.addAll([
         MovePattern.linear,
         MovePattern.zigzag,
