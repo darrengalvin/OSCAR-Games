@@ -24,11 +24,12 @@ class _ShopScreenState extends State<ShopScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   int _selectedMoodIndex = 0;
+  int _buyDiamondTapCount = 0;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 5, vsync: this);
   }
 
   @override
@@ -74,41 +75,105 @@ class _ShopScreenState extends State<ShopScreen>
     }
   }
 
-  void _openCrate() {
+  void _buyArrow(ArrowSkin arrow) {
+    if (player.ownsArrow(arrow.id)) {
+      player.equipArrow(arrow.id);
+      setState(() {});
+      widget.onUpdate();
+      _showMessage('Equipped ${arrow.name}!');
+      return;
+    }
+
+    if (player.spendDiamonds(arrow.diamondPrice)) {
+      player.unlockArrow(arrow.id);
+      player.equipArrow(arrow.id);
+      setState(() {});
+      widget.onUpdate();
+      _showMessage('Unlocked ${arrow.name}!', color: AppTheme.success);
+    } else {
+      _showMessage(
+        'Need ${arrow.diamondPrice - player.diamonds} more diamonds!',
+        color: AppTheme.danger,
+      );
+    }
+  }
+
+  void _openStandardCrate() {
     if (!player.spendDiamonds(50)) {
       _showMessage('Need 50 diamonds for a crate!', color: AppTheme.danger);
       return;
     }
 
-    final bow = _rollCrate();
+    final bow = _rollStandardCrate();
     player.unlockBow(bow.id);
     setState(() {});
     widget.onUpdate();
-
     _showCrateResult(bow);
   }
 
-  Bow _rollCrate() {
+  Bow _rollStandardCrate() {
     final roll = Random().nextInt(100);
-
     if (roll < 50) {
       return Bow.allBows.firstWhere((b) => b.id == 'pink');
     } else if (roll < 72) {
-      final options = ['yellow_orange', 'red_orange', 'blue_purple'];
-      return Bow.allBows
-          .firstWhere((b) => b.id == options[Random().nextInt(options.length)]);
+      final opts = ['yellow_orange', 'red_orange', 'blue_purple'];
+      return Bow.allBows.firstWhere((b) => b.id == opts[Random().nextInt(opts.length)]);
     } else if (roll < 85) {
-      final options = ['orange_purple', 'yellow_green', 'red_pink'];
-      return Bow.allBows
-          .firstWhere((b) => b.id == options[Random().nextInt(options.length)]);
-    } else if (roll < 90) {
-      final options = ['gold', 'neon_green'];
-      return Bow.allBows
-          .firstWhere((b) => b.id == options[Random().nextInt(options.length)]);
-    } else if (roll < 99) {
-      return Bow.allBows.firstWhere((b) => b.id == 'gold');
+      final opts = ['orange_purple', 'yellow_green', 'red_pink'];
+      return Bow.allBows.firstWhere((b) => b.id == opts[Random().nextInt(opts.length)]);
+    } else if (roll < 95) {
+      final opts = ['gold', 'neon_green'];
+      return Bow.allBows.firstWhere((b) => b.id == opts[Random().nextInt(opts.length)]);
     } else {
       return Bow.allBows.firstWhere((b) => b.id == 'rainbow');
+    }
+  }
+
+  void _openMysteryCrate() {
+    if (!player.spendDiamonds(100)) {
+      _showMessage('Need 100 diamonds!', color: AppTheme.danger);
+      return;
+    }
+
+    final roll = Random().nextInt(100);
+    if (roll < 25) {
+      // Dark Shadow Bow
+      final bow = Bow.allBows.firstWhere((b) => b.id == 'dark_shadow');
+      player.unlockBow(bow.id);
+      setState(() {});
+      widget.onUpdate();
+      _showCrateResult(bow);
+    } else if (roll < 50) {
+      // Rainbow Bow
+      final bow = Bow.allBows.firstWhere((b) => b.id == 'rainbow');
+      player.unlockBow(bow.id);
+      setState(() {});
+      widget.onUpdate();
+      _showCrateResult(bow);
+    } else if (roll < 75) {
+      // Blue Bow
+      final bow = Bow.allBows.firstWhere((b) => b.id == 'blue_purple');
+      player.unlockBow(bow.id);
+      setState(() {});
+      widget.onUpdate();
+      _showCrateResult(bow);
+    } else if (roll < 99) {
+      // 67 Keychain
+      player.has67Keychain = true;
+      player.save();
+      setState(() {});
+      widget.onUpdate();
+      _showKeychainResult('67 Keychain', '🔑 67', const Color(0xFFFF6B6B));
+    } else {
+      // Everything from the crate
+      for (final bow in Bow.allBows) {
+        player.unlockBow(bow.id);
+      }
+      player.has67Keychain = true;
+      player.save();
+      setState(() {});
+      widget.onUpdate();
+      _showJackpotResult();
     }
   }
 
@@ -147,8 +212,7 @@ class _ShopScreenState extends State<ShopScreen>
               ),
               const SizedBox(height: 8),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                 decoration: BoxDecoration(
                   color: Bow.rarityColor(bow.rarity).withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(8),
@@ -162,13 +226,29 @@ class _ShopScreenState extends State<ShopScreen>
                   ),
                 ),
               ),
+              if (bow.hasPauseAbility) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFF0040).withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Text(
+                    '⚡ Pause Ability: Freezes all targets for 5s on hit!',
+                    style: TextStyle(
+                      color: Color(0xFFFF0040),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ],
               if (bow.hasMoodMode) ...[
                 const SizedBox(height: 12),
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
                     color: AppTheme.warning.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(8),
@@ -201,6 +281,89 @@ class _ShopScreenState extends State<ShopScreen>
     );
   }
 
+  void _showKeychainResult(String name, String emoji, Color color) {
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: AppTheme.cardColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(emoji, style: const TextStyle(fontSize: 56)),
+              const SizedBox(height: 16),
+              Text(
+                name,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Added to your collection!',
+                style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text('Nice!'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showJackpotResult() {
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: AppTheme.cardColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('🎉', style: TextStyle(fontSize: 56)),
+              const SizedBox(height: 16),
+              ShaderMask(
+                shaderCallback: (bounds) => const LinearGradient(
+                  colors: [Colors.red, Colors.orange, Colors.yellow,
+                    Colors.green, Colors.blue, Colors.purple],
+                ).createShader(bounds),
+                child: const Text(
+                  'JACKPOT!',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 28,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'You got EVERYTHING!\nAll bows + 67 Keychain unlocked!',
+                style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text('Amazing!'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   void _buyVip() {
     _showPurchaseDialog(
       title: 'VIP Pass',
@@ -215,8 +378,7 @@ class _ShopScreenState extends State<ShopScreen>
         }
         setState(() {});
         widget.onUpdate();
-        _showMessage('VIP Activated! All bows unlocked!',
-            color: AppTheme.warning);
+        _showMessage('VIP Activated! All bows unlocked!', color: AppTheme.warning);
       },
     );
   }
@@ -230,11 +392,43 @@ class _ShopScreenState extends State<ShopScreen>
       color: AppTheme.purple,
       onConfirm: () {
         player.hasShieldKeychain = true;
+        player.save();
         setState(() {});
         widget.onUpdate();
         _showMessage('Shield Keychain acquired!', color: AppTheme.purple);
       },
     );
+  }
+
+  void _buy67Keychain() {
+    if (player.has67Keychain) {
+      _showMessage('You already have the 67 Keychain!');
+      return;
+    }
+    _showMessage('67 Keychain only available from the Mystery Crate!',
+        color: AppTheme.warning);
+  }
+
+  void _buyComboKeychain() {
+    if (player.hasComboKeychain) {
+      _showMessage('You already have the Combo Keychain!');
+      return;
+    }
+    if (!player.hasShieldKeychain || !player.has67Keychain) {
+      _showMessage('You need both Shield & 67 keychains first!',
+          color: AppTheme.danger);
+      return;
+    }
+    if (player.spendDiamonds(320)) {
+      player.hasComboKeychain = true;
+      player.save();
+      setState(() {});
+      widget.onUpdate();
+      _showMessage('Combo Keychain unlocked!', color: AppTheme.success);
+    } else {
+      _showMessage('Need ${320 - player.diamonds} more diamonds!',
+          color: AppTheme.danger);
+    }
   }
 
   void _buyExclusiveCrate() {
@@ -251,12 +445,112 @@ class _ShopScreenState extends State<ShopScreen>
       icon: Icons.inventory_2_rounded,
       color: AppTheme.accent,
       onConfirm: () {
-        final bow = _rollCrate();
+        final bow = _rollStandardCrate();
         player.unlockBow(bow.id);
         setState(() {});
         widget.onUpdate();
         _showCrateResult(bow);
       },
+    );
+  }
+
+  // --- Secret diamond hack ---
+  void _onBuyDiamondsTap(int amount) {
+    _buyDiamondTapCount++;
+    if (_buyDiamondTapCount >= 7) {
+      _buyDiamondTapCount = 0;
+      _showPasswordDialog(amount);
+    } else {
+      _showPurchaseDialog(
+        title: '$amount Diamonds',
+        price: amount == 100
+            ? '£0.59'
+            : amount == 500
+                ? '£1.29'
+                : '£3.00',
+        description: 'Purchase $amount diamonds to spend in the shop!',
+        icon: Icons.diamond_rounded,
+        color: AppTheme.accent,
+        onConfirm: () {
+          player.addDiamonds(amount);
+          setState(() {});
+          widget.onUpdate();
+          _showMessage('+$amount Diamonds!', color: AppTheme.success);
+        },
+      );
+    }
+  }
+
+  void _showPasswordDialog(int amount) {
+    final controller = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: AppTheme.cardColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        child: Padding(
+          padding: const EdgeInsets.all(28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.lock_rounded, color: AppTheme.accent, size: 40),
+              const SizedBox(height: 16),
+              const Text(
+                'Enter Password',
+                style: TextStyle(
+                  color: AppTheme.textPrimary,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: controller,
+                obscureText: true,
+                style: const TextStyle(color: AppTheme.textPrimary),
+                decoration: InputDecoration(
+                  hintText: 'Password...',
+                  hintStyle: TextStyle(
+                    color: AppTheme.textSecondary.withValues(alpha: 0.5),
+                  ),
+                  filled: true,
+                  fillColor: AppTheme.surface,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.of(ctx).pop(),
+                    child: const Text('Cancel'),
+                  ),
+                  ElevatedButton(
+                    onPressed: () {
+                      if (controller.text.toLowerCase() == 'oscar') {
+                        Navigator.of(ctx).pop();
+                        player.addDiamonds(amount);
+                        setState(() {});
+                        widget.onUpdate();
+                        _showMessage('💎 +$amount Diamonds! Boss mode activated!',
+                            color: AppTheme.success);
+                      } else {
+                        Navigator.of(ctx).pop();
+                        _showMessage('Wrong password!', color: AppTheme.danger);
+                      }
+                    },
+                    child: const Text('Submit'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -297,8 +591,7 @@ class _ShopScreenState extends State<ShopScreen>
               ),
               const SizedBox(height: 8),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                 decoration: BoxDecoration(
                   color: color.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(10),
@@ -360,12 +653,15 @@ class _ShopScreenState extends State<ShopScreen>
             unselectedLabelColor: AppTheme.textSecondary,
             indicatorColor: AppTheme.accent,
             indicatorSize: TabBarIndicatorSize.label,
+            isScrollable: true,
+            tabAlignment: TabAlignment.center,
             labelStyle: const TextStyle(
               fontWeight: FontWeight.bold,
-              fontSize: 12,
+              fontSize: 11,
             ),
             tabs: const [
               Tab(text: 'BOWS'),
+              Tab(text: 'ARROWS'),
               Tab(text: 'CRATES'),
               Tab(text: 'PASSES'),
               Tab(text: 'ITEMS'),
@@ -376,6 +672,7 @@ class _ShopScreenState extends State<ShopScreen>
               controller: _tabController,
               children: [
                 _buildBowsTab(),
+                _buildArrowsTab(),
                 _buildCratesTab(),
                 _buildPassesTab(),
                 _buildItemsTab(),
@@ -418,18 +715,12 @@ class _ShopScreenState extends State<ShopScreen>
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        // Equipped bow preview
         _buildEquippedPreview(),
         const SizedBox(height: 20),
-
-        // Mood mode (if rainbow bow owned)
-        if (player.ownsBow('rainbow') &&
-            player.equippedBowId == 'rainbow') ...[
+        if (player.ownsBow('rainbow') && player.equippedBowId == 'rainbow') ...[
           _buildMoodModeSection(),
           const SizedBox(height: 20),
         ],
-
-        // All bows grid
         GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
@@ -437,12 +728,163 @@ class _ShopScreenState extends State<ShopScreen>
             crossAxisCount: 2,
             crossAxisSpacing: 12,
             mainAxisSpacing: 12,
-            childAspectRatio: 0.75,
+            childAspectRatio: 0.7,
           ),
           itemCount: Bow.allBows.length,
           itemBuilder: (context, index) => _buildBowCard(Bow.allBows[index]),
         ),
       ],
+    );
+  }
+
+  // === ARROWS TAB ===
+  Widget _buildArrowsTab() {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        // Equipped arrow
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: player.equippedArrow.color.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: player.equippedArrow.color.withValues(alpha: 0.3),
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: player.equippedArrow.color.withValues(alpha: 0.3),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.arrow_upward_rounded,
+                    color: player.equippedArrow.color, size: 24),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'EQUIPPED ARROW',
+                      style: TextStyle(
+                        color: AppTheme.textSecondary,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 2,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      player.equippedArrow.name,
+                      style: TextStyle(
+                        color: player.equippedArrow.color,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        ...ArrowSkin.allArrows.map((arrow) => Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: _buildArrowCard(arrow),
+        )),
+      ],
+    );
+  }
+
+  Widget _buildArrowCard(ArrowSkin arrow) {
+    final owned = player.ownsArrow(arrow.id);
+    final equipped = player.equippedArrowId == arrow.id;
+
+    return GestureDetector(
+      onTap: () => _buyArrow(arrow),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: owned
+              ? arrow.color.withValues(alpha: 0.08)
+              : AppTheme.cardColor,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: equipped
+                ? arrow.color
+                : arrow.color.withValues(alpha: 0.2),
+            width: equipped ? 2 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: arrow.color.withValues(alpha: 0.2),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.arrow_upward_rounded,
+                  color: arrow.color, size: 22),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    arrow.name,
+                    style: TextStyle(
+                      color: arrow.color,
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (owned)
+              Text(
+                equipped ? '✓ Active' : 'Tap to Equip',
+                style: TextStyle(
+                  color: equipped ? AppTheme.success : AppTheme.textSecondary,
+                  fontSize: 12,
+                ),
+              )
+            else
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppTheme.accent.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.diamond_rounded,
+                        color: AppTheme.accent, size: 12),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${arrow.diamondPrice}',
+                      style: const TextStyle(
+                        color: AppTheme.accent,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -494,8 +936,7 @@ class _ShopScreenState extends State<ShopScreen>
                 ),
                 const SizedBox(height: 4),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
                     color: Bow.rarityColor(bow.rarity).withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(6),
@@ -509,6 +950,17 @@ class _ShopScreenState extends State<ShopScreen>
                     ),
                   ),
                 ),
+                if (bow.hasPauseAbility) ...[
+                  const SizedBox(height: 6),
+                  const Text(
+                    '⚡ Pause Ability Active',
+                    style: TextStyle(
+                      color: Color(0xFFFF0040),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
                 if (bow.hasMoodMode) ...[
                   const SizedBox(height: 6),
                   const Text(
@@ -643,7 +1095,7 @@ class _ShopScreenState extends State<ShopScreen>
     return GestureDetector(
       onTap: () => _buyBow(bow),
       child: Container(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: owned
               ? rarityColor.withValues(alpha: 0.08)
@@ -668,9 +1120,8 @@ class _ShopScreenState extends State<ShopScreen>
           children: [
             if (equipped)
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                margin: const EdgeInsets.only(bottom: 4),
                 decoration: BoxDecoration(
                   color: AppTheme.success.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(6),
@@ -686,15 +1137,15 @@ class _ShopScreenState extends State<ShopScreen>
                 ),
               ),
             Expanded(
-              child: BowPreviewWidget(bow: bow, size: 70),
+              child: BowPreviewWidget(bow: bow, size: 65),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 4),
             Text(
               bow.name,
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: rarityColor,
-                fontSize: 13,
+                fontSize: 12,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -714,21 +1165,29 @@ class _ShopScreenState extends State<ShopScreen>
                 ),
               ),
             ),
-            const SizedBox(height: 8),
+            if (bow.hasPauseAbility) ...[
+              const SizedBox(height: 4),
+              const Text(
+                '⚡ Pause',
+                style: TextStyle(
+                  color: Color(0xFFFF0040),
+                  fontSize: 9,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+            const SizedBox(height: 6),
             if (owned)
               Text(
                 equipped ? '✓ Active' : 'Tap to Equip',
                 style: TextStyle(
-                  color: equipped
-                      ? AppTheme.success
-                      : AppTheme.textSecondary,
+                  color: equipped ? AppTheme.success : AppTheme.textSecondary,
                   fontSize: 11,
                 ),
               )
             else
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   color: AppTheme.accent.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(8),
@@ -775,7 +1234,24 @@ class _ShopScreenState extends State<ShopScreen>
             'Rare Bow (5%)',
             'Legendary Rainbow (1%)',
           ],
-          onBuy: _openCrate,
+          onBuy: _openStandardCrate,
+        ),
+        const SizedBox(height: 16),
+        _buildCrateCard(
+          title: 'Mystery Crate',
+          subtitle: 'Rare drops inside!',
+          price: '100',
+          currency: 'diamonds',
+          icon: Icons.help_outline_rounded,
+          color: const Color(0xFFFF0040),
+          drops: [
+            '🖤 Dark Shadow Bow (25%)',
+            '🌈 Rainbow Bow (25%)',
+            '💙 Blue Bow (25%)',
+            '🔑 67 Keychain (24%)',
+            '🎉 EVERYTHING! (1%)',
+          ],
+          onBuy: _openMysteryCrate,
         ),
         const SizedBox(height: 16),
         _buildCrateCard(
@@ -788,8 +1264,8 @@ class _ShopScreenState extends State<ShopScreen>
           drops: [
             'Pink Bow (50%)',
             'Orange/Yellow/Blue Bow (22%)',
-            'Orange/Yellow/Green/Pink/Blue Bow (13%)',
-            'Green/Orange/Red/Blue Bow (5%)',
+            'Multi-Color Bow (13%)',
+            'Rare Bow (5%)',
             '🌈 Rainbow Bow w/ Mood Mode (1%)',
           ],
           onBuy: _buyExclusiveCrate,
@@ -873,17 +1349,16 @@ class _ShopScreenState extends State<ShopScreen>
                 padding: const EdgeInsets.only(bottom: 4),
                 child: Row(
                   children: [
-                    Icon(
-                      Icons.circle,
-                      size: 6,
-                      color: color.withValues(alpha: 0.5),
-                    ),
+                    Icon(Icons.circle, size: 6,
+                        color: color.withValues(alpha: 0.5)),
                     const SizedBox(width: 8),
-                    Text(
-                      drop,
-                      style: const TextStyle(
-                        color: AppTheme.textSecondary,
-                        fontSize: 12,
+                    Expanded(
+                      child: Text(
+                        drop,
+                        style: const TextStyle(
+                          color: AppTheme.textSecondary,
+                          fontSize: 12,
+                        ),
                       ),
                     ),
                   ],
@@ -926,11 +1401,11 @@ class _ShopScreenState extends State<ShopScreen>
           title: 'VIP Pass',
           price: '£3.50',
           description:
-              'Get access to ALL 10 bows! Pick any 5 of your choice and unlock them instantly.',
+              'Get access to ALL bows! Pick any 5 of your choice and unlock them instantly.',
           icon: Icons.workspace_premium_rounded,
           color: AppTheme.warning,
           perks: [
-            'Unlock all 10 bow designs',
+            'Unlock all bow designs',
             'Choose 5 bows of your choice',
             'Includes Rainbow Bow',
             'Mood Mode for Rainbow Bow',
@@ -939,7 +1414,84 @@ class _ShopScreenState extends State<ShopScreen>
           owned: player.hasVip,
           onBuy: _buyVip,
         ),
+        const SizedBox(height: 16),
+        // Diamond purchase options
+        const Padding(
+          padding: EdgeInsets.only(left: 4, bottom: 12),
+          child: Text(
+            'BUY DIAMONDS',
+            style: TextStyle(
+              color: AppTheme.textSecondary,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 2,
+            ),
+          ),
+        ),
+        _buildDiamondPurchase(100, '£0.59'),
+        const SizedBox(height: 10),
+        _buildDiamondPurchase(500, '£1.29'),
+        const SizedBox(height: 10),
+        _buildDiamondPurchase(1500, '£3.00'),
       ],
+    );
+  }
+
+  Widget _buildDiamondPurchase(int amount, String price) {
+    return GestureDetector(
+      onTap: () => _onBuyDiamondsTap(amount),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              AppTheme.accent.withValues(alpha: 0.12),
+              AppTheme.accent.withValues(alpha: 0.04),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppTheme.accent.withValues(alpha: 0.2)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppTheme.accent.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.diamond_rounded,
+                  color: AppTheme.accent, size: 28),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Text(
+                '$amount Diamonds',
+                style: const TextStyle(
+                  color: AppTheme.accent,
+                  fontSize: 17,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                color: AppTheme.accent,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                price,
+                style: const TextStyle(
+                  color: AppTheme.primaryDark,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -1054,12 +1606,34 @@ class _ShopScreenState extends State<ShopScreen>
         _buildItemCard(
           title: 'Shield Keychain',
           price: '£0.59',
-          description:
-              'A special shield keychain that attaches to your bow. Show off your style!',
+          description: 'A special shield keychain accessory for your bow!',
           icon: Icons.shield_rounded,
           color: AppTheme.purple,
           owned: player.hasShieldKeychain,
           onBuy: _buyShieldKeychain,
+        ),
+        const SizedBox(height: 12),
+        _buildItemCard(
+          title: '67 Keychain',
+          price: 'Mystery Crate',
+          description:
+              'The viral 67 keychain. Only available from the Mystery Crate!',
+          icon: Icons.key_rounded,
+          color: const Color(0xFFFF6B6B),
+          owned: player.has67Keychain,
+          onBuy: _buy67Keychain,
+        ),
+        const SizedBox(height: 12),
+        _buildItemCard(
+          title: 'Combo Keychain',
+          price: '320 💎',
+          description:
+              'Combines Shield + 67 keychains into one ultimate keychain! '
+              'Requires both keychains first.',
+          icon: Icons.all_inclusive_rounded,
+          color: AppTheme.warning,
+          owned: player.hasComboKeychain,
+          onBuy: _buyComboKeychain,
         ),
       ],
     );
@@ -1130,7 +1704,7 @@ class _ShopScreenState extends State<ShopScreen>
                       padding: const EdgeInsets.symmetric(vertical: 10),
                     ),
                     child: Text(
-                      owned ? 'OWNED ✓' : 'Buy for $price',
+                      owned ? 'OWNED ✓' : price,
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
                   ),

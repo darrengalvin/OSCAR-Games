@@ -17,18 +17,26 @@ class SaveService {
   Future<void> savePlayerData({
     required int diamonds,
     required List<String> ownedBowIds,
+    required List<String> ownedArrowIds,
     required String equippedBowId,
+    required String equippedArrowId,
     required bool hasVip,
     required bool hasShieldKeychain,
+    required bool has67Keychain,
+    required bool hasComboKeychain,
     required Map<String, int> worldProgress,
     required int totalTargetsHit,
     required int totalLevelsCompleted,
   }) async {
     await _prefs.setInt('diamonds', diamonds);
     await _prefs.setStringList('ownedBowIds', ownedBowIds);
+    await _prefs.setStringList('ownedArrowIds', ownedArrowIds);
     await _prefs.setString('equippedBowId', equippedBowId);
+    await _prefs.setString('equippedArrowId', equippedArrowId);
     await _prefs.setBool('hasVip', hasVip);
     await _prefs.setBool('hasShieldKeychain', hasShieldKeychain);
+    await _prefs.setBool('has67Keychain', has67Keychain);
+    await _prefs.setBool('hasComboKeychain', hasComboKeychain);
     await _prefs.setString('worldProgress', jsonEncode(worldProgress));
     await _prefs.setInt('totalTargetsHit', totalTargetsHit);
     await _prefs.setInt('totalLevelsCompleted', totalLevelsCompleted);
@@ -37,19 +45,32 @@ class SaveService {
   int get diamonds => _prefs.getInt('diamonds') ?? 25;
   List<String> get ownedBowIds =>
       _prefs.getStringList('ownedBowIds') ?? ['default'];
+  List<String> get ownedArrowIds =>
+      _prefs.getStringList('ownedArrowIds') ?? ['default'];
   String get equippedBowId => _prefs.getString('equippedBowId') ?? 'default';
+  String get equippedArrowId =>
+      _prefs.getString('equippedArrowId') ?? 'default';
   bool get hasVip => _prefs.getBool('hasVip') ?? false;
   bool get hasShieldKeychain => _prefs.getBool('hasShieldKeychain') ?? false;
+  bool get has67Keychain => _prefs.getBool('has67Keychain') ?? false;
+  bool get hasComboKeychain => _prefs.getBool('hasComboKeychain') ?? false;
   int get totalTargetsHit => _prefs.getInt('totalTargetsHit') ?? 0;
   int get totalLevelsCompleted => _prefs.getInt('totalLevelsCompleted') ?? 0;
 
   Map<String, int> get worldProgress {
     final raw = _prefs.getString('worldProgress');
     if (raw == null) {
-      return {'playground': 1, 'jupiter': 1, 'backrooms': 1};
+      return {
+        'playground': 1,
+        'jupiter': 1,
+        'backrooms': 1,
+        'bedroom': 1,
+      };
     }
     final decoded = jsonDecode(raw) as Map<String, dynamic>;
-    return decoded.map((k, v) => MapEntry(k, v as int));
+    final result = decoded.map((k, v) => MapEntry(k, v as int));
+    result.putIfAbsent('bedroom', () => 1);
+    return result;
   }
 
   bool get hasPlayerData => _prefs.getInt('diamonds') != null;
@@ -68,13 +89,9 @@ class SaveService {
     return _prefs.getInt('highscore_$gameId') ?? 0;
   }
 
-  // --- Snake ---
-
   Future<void> saveSnakeHighScore(int score) =>
       saveHighScore('snake', score);
   int get snakeHighScore => getHighScore('snake');
-
-  // --- Tic Tac Toe ---
 
   Future<void> saveTicTacToeStats({
     required int winsX,
@@ -89,8 +106,6 @@ class SaveService {
   int get tttWinsX => _prefs.getInt('ttt_winsX') ?? 0;
   int get tttWinsO => _prefs.getInt('ttt_winsO') ?? 0;
   int get tttDraws => _prefs.getInt('ttt_draws') ?? 0;
-
-  // --- Memory Match ---
 
   Future<void> saveMemoryBestMoves(int gridSize, int moves) async {
     final key = 'memory_best_${gridSize}x$gridSize';
@@ -112,8 +127,6 @@ class SaveService {
       _prefs.getInt('memory_best_${gridSize}x$gridSize');
   int? memoryBestTime(int gridSize) =>
       _prefs.getInt('memory_time_${gridSize}x$gridSize');
-
-  // --- Reaction Speed ---
 
   Future<void> saveReactionBest(int ms) async {
     final current = _prefs.getInt('reaction_best');

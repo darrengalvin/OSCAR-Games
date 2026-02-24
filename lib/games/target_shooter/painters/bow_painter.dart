@@ -97,8 +97,8 @@ class BowPainter extends CustomPainter {
       canvas.drawPath(headPath, headPaint);
     }
 
-    // Glow effect for legendary
-    if (bow.rarity == BowRarity.legendary) {
+    // Glow effect for legendary/mythic
+    if (bow.rarity == BowRarity.legendary || bow.rarity == BowRarity.mythic) {
       final glowPaint = Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = 8

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../theme/app_theme.dart';
 import '../../services/sound_service.dart';
+import 'models/bow.dart';
 import 'models/game_world.dart';
 import 'models/player_data.dart';
 import 'models/target.dart';
@@ -27,7 +28,6 @@ class TargetGameScreen extends StatefulWidget {
 
 class _TargetGameScreenState extends State<TargetGameScreen>
     with TickerProviderStateMixin {
-  // Level state
   late int currentLevel;
   List<ShootingTarget> targets = [];
   List<Arrow> arrows = [];
@@ -40,22 +40,22 @@ class _TargetGameScreenState extends State<TargetGameScreen>
   int countdown = 3;
   Size? _gameAreaSize;
 
-  // Timer
   double timeLeft = 0;
   double maxTime = 0;
 
-  // Wind
   double windForce = 0;
   static const double gravity = 4.0;
 
-  // Aiming state
   bool _isAiming = false;
   Offset _aimPoint = Offset.zero;
   double _drawStrength = 0;
   Offset? _dragStart;
   double _bowAngle = -pi / 2;
 
-  // Animation
+  // Dark Shadow ability
+  bool _pauseAbilityActive = false;
+  double _pauseCooldownTimer = 0;
+
   Timer? _gameLoop;
   Timer? _countdownTimer;
   late AnimationController _hitController;
@@ -65,11 +65,19 @@ class _TargetGameScreenState extends State<TargetGameScreen>
 
   final int targetsPerLevel = 5;
 
-  // Bow position (bottom center of game area)
   Offset get _bowPosition {
     final s = _gameAreaSize;
     if (s == null) return Offset.zero;
-    return Offset(s.width / 2, s.height - 40);
+    return Offset(s.width / 2, s.height - 60);
+  }
+
+  // The nock point where the arrow launches from (tip of the bow)
+  Offset get _arrowLaunchPoint {
+    final bowR = 35.0;
+    return Offset(
+      _bowPosition.dx + cos(_bowAngle) * bowR * 0.9,
+      _bowPosition.dy + sin(_bowAngle) * bowR * 0.9,
+    );
   }
 
   @override
@@ -96,21 +104,22 @@ class _TargetGameScreenState extends State<TargetGameScreen>
     super.dispose();
   }
 
-  // --- Level setup ---
-
   int _arrowBudget() {
-    // Generous early, tight late: level 1 = 10 arrows, level 20 = 6
-    return (10 - (currentLevel - 1) * 0.22).round().clamp(6, 10);
+    // Level 1-10: 12 arrows, level 11-30: 10, level 31-50: 7
+    if (currentLevel <= 10) return 12;
+    if (currentLevel <= 30) return 10;
+    return (10 - (currentLevel - 30) * 0.15).round().clamp(7, 10);
   }
 
   double _timeForLevel() {
-    // Seconds: level 1 = 30s, level 20 = 15s
-    return (30 - (currentLevel - 1) * 0.8).clamp(15.0, 30.0);
+    // Level 1-5: 40s, then decrease to 15s at level 50
+    if (currentLevel <= 5) return 40;
+    return (40 - (currentLevel - 5) * 0.56).clamp(15.0, 40.0);
   }
 
   double _windForLevel() {
-    if (currentLevel <= 3) return 0;
-    final maxWind = (currentLevel * 0.15).clamp(0.0, 2.5);
+    if (currentLevel <= 8) return 0;
+    final maxWind = ((currentLevel - 8) * 0.06).clamp(0.0, 2.5);
     return (Random().nextDouble() * 2 - 1) * maxWind;
   }
 
@@ -119,6 +128,8 @@ class _TargetGameScreenState extends State<TargetGameScreen>
     showCountdown = true;
     levelComplete = false;
     levelFailed = false;
+    _pauseAbilityActive = false;
+    _pauseCooldownTimer = 0;
     _countdownTimer?.cancel();
     _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (!mounted) {
@@ -168,41 +179,42 @@ class _TargetGameScreenState extends State<TargetGameScreen>
     });
   }
 
-  // --- Game loop ---
-
   void _tick(Timer timer) {
     if (!mounted || levelComplete || levelFailed || showCountdown) return;
 
     const dt = 1.0 / 60.0;
 
     setState(() {
-      // Timer countdown
       timeLeft -= dt;
       if (timeLeft <= 0) {
         timeLeft = 0;
         SoundService.instance.play(GameSound.levelFail);
-        _failLevel('Time\'s up!');
+        _failLevel();
         return;
       }
 
-      // Move targets
+      // Pause ability cooldown
+      if (_pauseAbilityActive) {
+        _pauseCooldownTimer -= dt;
+        if (_pauseCooldownTimer <= 0) {
+          _pauseAbilityActive = false;
+        }
+      }
+
       for (final t in targets) {
         t.update(dt, _gameAreaSize!);
       }
 
-      // Update arrows
       for (final arrow in arrows) {
         if (!arrow.active || arrow.stuck) continue;
 
         arrow.update(dt, gravity, windForce);
 
-        // Check off-screen
         if (arrow.isOffScreen(_gameAreaSize!)) {
           arrow.active = false;
           continue;
         }
 
-        // Check target collision
         for (final target in targets) {
           if (target.isHit) continue;
           if (target.containsPoint(arrow.position)) {
@@ -212,7 +224,6 @@ class _TargetGameScreenState extends State<TargetGameScreen>
         }
       }
 
-      // Clean up old inactive arrows
       arrows.removeWhere((a) => !a.active && !a.stuck);
     });
   }
@@ -230,12 +241,21 @@ class _TargetGameScreenState extends State<TargetGameScreen>
     HapticFeedback.mediumImpact();
     _hitController.forward(from: 0);
 
+    // Dark Shadow ability: pause all remaining targets
+    if (widget.playerData.equippedBow.hasPauseAbility && !_pauseAbilityActive) {
+      _pauseAbilityActive = true;
+      _pauseCooldownTimer = 5.0;
+      for (final t in targets) {
+        if (!t.isHit) {
+          t.pauseFor(5.0);
+        }
+      }
+    }
+
     if (targetsHit >= targetsPerLevel) {
       _completeLevel();
     }
   }
-
-  // --- Shooting ---
 
   void _onPanStart(DragStartDetails details) {
     if (levelComplete || levelFailed || showCountdown || arrowsLeft <= 0) return;
@@ -252,12 +272,9 @@ class _TargetGameScreenState extends State<TargetGameScreen>
 
     setState(() {
       _aimPoint = details.localPosition;
-
-      // Draw strength based on how far you pull down/back from start
       final pull = (_dragStart! - _aimPoint).distance;
       _drawStrength = (pull / 150.0).clamp(0.0, 1.0);
 
-      // Bow angle: point from bow toward aim
       final dx = _aimPoint.dx - _bowPosition.dx;
       final dy = _aimPoint.dy - _bowPosition.dy;
       _bowAngle = atan2(dy, dx);
@@ -283,8 +300,8 @@ class _TargetGameScreenState extends State<TargetGameScreen>
     SoundService.instance.play(GameSound.shoot);
     HapticFeedback.lightImpact();
 
-    // Arrow flies from bow toward aim point
     final speed = 6.0 + _drawStrength * 10.0;
+    final launchPt = _arrowLaunchPoint;
     final dx = _aimPoint.dx - _bowPosition.dx;
     final dy = _aimPoint.dy - _bowPosition.dy;
     final dist = sqrt(dx * dx + dy * dy);
@@ -297,39 +314,37 @@ class _TargetGameScreenState extends State<TargetGameScreen>
       arrowsLeft--;
       totalShots++;
       arrows.add(Arrow(
-        position: _bowPosition,
+        position: launchPt,
         vx: vx,
         vy: vy,
         angle: atan2(vy, vx),
       ));
     });
 
-    // Check if out of arrows and still targets left
     Future.delayed(const Duration(seconds: 2), () {
       if (!mounted || levelComplete || levelFailed) return;
       if (arrowsLeft <= 0 && targetsHit < targetsPerLevel) {
         final anyActive = arrows.any((a) => a.active && !a.stuck);
         if (!anyActive) {
           SoundService.instance.play(GameSound.bowTwang);
-          _failLevel('Out of arrows!');
+          _failLevel();
         }
       }
     });
   }
 
-  // --- Level end ---
-
   void _completeLevel() {
     _gameLoop?.cancel();
     setState(() => levelComplete = true);
-    widget.playerData.completeLevel(widget.world.id);
+    final reward = widget.world.diamondsPerLevel;
+    widget.playerData.completeLevel(widget.world.id, diamondReward: reward);
     widget.onComplete();
     SoundService.instance.play(GameSound.levelComplete);
     _levelUpController.forward(from: 0);
     HapticFeedback.heavyImpact();
   }
 
-  void _failLevel(String reason) {
+  void _failLevel() {
     _gameLoop?.cancel();
     setState(() => levelFailed = true);
     SoundService.instance.play(GameSound.levelFail);
@@ -337,7 +352,7 @@ class _TargetGameScreenState extends State<TargetGameScreen>
   }
 
   void _nextLevel() {
-    if (currentLevel >= 20) {
+    if (currentLevel >= PlayerData.maxLevel) {
       _showWorldCompleteDialog();
       return;
     }
@@ -375,7 +390,7 @@ class _TargetGameScreenState extends State<TargetGameScreen>
               ),
               const SizedBox(height: 8),
               const Text(
-                'You conquered all 20 levels!',
+                'You conquered all 50 levels!',
                 style: TextStyle(color: AppTheme.textSecondary, fontSize: 14),
               ),
               const SizedBox(height: 24),
@@ -397,8 +412,6 @@ class _TargetGameScreenState extends State<TargetGameScreen>
     if (totalShots == 0) return 0;
     return ((targetsHit / totalShots) * 100).round();
   }
-
-  // --- Build ---
 
   @override
   Widget build(BuildContext context) {
@@ -443,7 +456,6 @@ class _TargetGameScreenState extends State<TargetGameScreen>
               Navigator.of(context).pop();
             },
           ),
-          // Level label
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
             decoration: BoxDecoration(
@@ -463,29 +475,34 @@ class _TargetGameScreenState extends State<TargetGameScreen>
             ),
           ),
           const SizedBox(width: 6),
-          // Timer
           _buildHudChip(
             Icons.timer_rounded,
             '${timeLeft.ceil()}s',
             timeLeft <= 5 ? AppTheme.danger : AppTheme.textSecondary,
           ),
           const Spacer(),
-          // Arrows left
           _buildHudChip(
             Icons.arrow_upward_rounded,
             '$arrowsLeft',
             arrowsLeft <= 2 ? AppTheme.warning : AppTheme.accent,
           ),
           const SizedBox(width: 6),
-          // Targets hit
           _buildHudChip(
             Icons.track_changes_rounded,
             '$targetsHit/$targetsPerLevel',
             AppTheme.success,
           ),
           const SizedBox(width: 6),
-          // Wind indicator
           if (windForce.abs() > 0.1) _buildWindIndicator(),
+          if (_pauseAbilityActive)
+            Padding(
+              padding: const EdgeInsets.only(left: 6),
+              child: _buildHudChip(
+                Icons.pause_circle_rounded,
+                '${_pauseCooldownTimer.ceil()}s',
+                const Color(0xFFFF0040),
+              ),
+            ),
         ],
       ),
     );
@@ -582,8 +599,11 @@ class _TargetGameScreenState extends State<TargetGameScreen>
               aimPoint: _aimPoint,
               targetColor: widget.world.targetColor,
               bowColors: widget.playerData.equippedBow.colors,
+              arrowColor: widget.playerData.equippedArrow.color,
               windForce: windForce,
               gameAreaSize: newSize,
+              isMythic: widget.playerData.equippedBow.rarity == BowRarity.mythic,
+              pauseActive: _pauseAbilityActive,
             ),
             size: newSize,
           ),
@@ -617,6 +637,24 @@ class _TargetGameScreenState extends State<TargetGameScreen>
                 fontWeight: FontWeight.bold,
               ),
             ),
+            if (widget.world.diamondMultiplier > 1) ...[
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppTheme.warning.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '💎 x${widget.world.diamondMultiplier} DIAMONDS',
+                  style: const TextStyle(
+                    color: AppTheme.warning,
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
             const SizedBox(height: 32),
             Text(
               countdown > 0 ? '$countdown' : 'GO!',
@@ -684,6 +722,7 @@ class _TargetGameScreenState extends State<TargetGameScreen>
         : _accuracy >= 50
             ? 2
             : 1;
+    final reward = widget.world.diamondsPerLevel;
 
     return ScaleTransition(
       scale: CurvedAnimation(
@@ -756,15 +795,15 @@ class _TargetGameScreenState extends State<TargetGameScreen>
                     color: AppTheme.accent.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Row(
+                  child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.diamond_rounded,
+                      const Icon(Icons.diamond_rounded,
                           color: AppTheme.accent, size: 18),
-                      SizedBox(width: 6),
+                      const SizedBox(width: 6),
                       Text(
-                        '+5 Diamonds',
-                        style: TextStyle(
+                        '+$reward Diamonds${reward > 5 ? ' (x${widget.world.diamondMultiplier})' : ''}',
+                        style: const TextStyle(
                           color: AppTheme.accent,
                           fontWeight: FontWeight.bold,
                           fontSize: 15,
@@ -786,7 +825,9 @@ class _TargetGameScreenState extends State<TargetGameScreen>
                       onPressed: _nextLevel,
                       icon: const Icon(Icons.arrow_forward_rounded),
                       label: Text(
-                          currentLevel >= 20 ? 'Finish' : 'Next Level'),
+                          currentLevel >= PlayerData.maxLevel
+                              ? 'Finish'
+                              : 'Next Level'),
                     ),
                   ],
                 ),
@@ -924,7 +965,6 @@ class _TargetGameScreenState extends State<TargetGameScreen>
   }
 }
 
-// All rendering in one custom painter for smooth 60fps
 class _GamePainter extends CustomPainter {
   final List<ShootingTarget> targets;
   final List<Arrow> arrows;
@@ -935,8 +975,11 @@ class _GamePainter extends CustomPainter {
   final Offset aimPoint;
   final Color targetColor;
   final List<Color> bowColors;
+  final Color arrowColor;
   final double windForce;
   final Size gameAreaSize;
+  final bool isMythic;
+  final bool pauseActive;
 
   _GamePainter({
     required this.targets,
@@ -948,8 +991,11 @@ class _GamePainter extends CustomPainter {
     required this.aimPoint,
     required this.targetColor,
     required this.bowColors,
+    required this.arrowColor,
     required this.windForce,
     required this.gameAreaSize,
+    required this.isMythic,
+    required this.pauseActive,
   });
 
   @override
@@ -970,13 +1016,19 @@ class _GamePainter extends CustomPainter {
       final center = target.position;
       final r = target.radius;
 
-      // Glow
+      // Paused glow
+      if (target.isPaused) {
+        final pauseGlow = Paint()
+          ..color = const Color(0xFFFF0040).withValues(alpha: 0.2)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12);
+        canvas.drawCircle(center, r + 6, pauseGlow);
+      }
+
       final glowPaint = Paint()
         ..color = targetColor.withValues(alpha: 0.15)
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10);
       canvas.drawCircle(center, r + 4, glowPaint);
 
-      // Rings: outer, middle, inner, bullseye
       final ringColors = [
         targetColor.withValues(alpha: 0.5),
         targetColor,
@@ -992,7 +1044,6 @@ class _GamePainter extends CustomPainter {
         canvas.drawCircle(center, r * ringRatios[i], paint);
       }
 
-      // Cross lines
       final linePaint = Paint()
         ..color = Colors.white.withValues(alpha: 0.25)
         ..strokeWidth = 0.8;
@@ -1018,14 +1069,12 @@ class _GamePainter extends CustomPainter {
         tip.dy - sin(arrow.angle) * arrowLen,
       );
 
-      // Arrow shaft
       final shaftPaint = Paint()
-        ..color = bowColors.first
+        ..color = arrowColor
         ..strokeWidth = 2.5
         ..strokeCap = StrokeCap.round;
       canvas.drawLine(tail, tip, shaftPaint);
 
-      // Arrow head
       final headPaint = Paint()
         ..color = Colors.white
         ..style = PaintingStyle.fill;
@@ -1044,10 +1093,9 @@ class _GamePainter extends CustomPainter {
         ..close();
       canvas.drawPath(headPath, headPaint);
 
-      // Glow trail
       if (arrow.active) {
         final trailPaint = Paint()
-          ..color = bowColors.first.withValues(alpha: 0.2)
+          ..color = arrowColor.withValues(alpha: 0.2)
           ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
         canvas.drawLine(tail, tip, trailPaint);
       }
@@ -1062,7 +1110,6 @@ class _GamePainter extends CustomPainter {
     canvas.translate(center.dx, center.dy);
     canvas.rotate(bowAngle + pi / 2);
 
-    // Bow arc
     final bowPaint = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = 5
@@ -1079,15 +1126,23 @@ class _GamePainter extends CustomPainter {
     final bowRect = Rect.fromCircle(center: Offset.zero, radius: bowR);
     canvas.drawArc(bowRect, -pi * 0.7, pi * 1.4, false, bowPaint);
 
-    // Glow behind bow
-    final glowP = Paint()
-      ..color = bowColors.first.withValues(alpha: 0.15)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 10;
-    canvas.drawArc(bowRect, -pi * 0.7, pi * 1.4, false, glowP);
+    // Mythic glow
+    if (isMythic) {
+      final mythGlow = Paint()
+        ..color = const Color(0xFFFF0040).withValues(alpha: 0.25)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 12;
+      canvas.drawArc(bowRect, -pi * 0.7, pi * 1.4, false, mythGlow);
+    } else {
+      final glowP = Paint()
+        ..color = bowColors.first.withValues(alpha: 0.15)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 10;
+      canvas.drawArc(bowRect, -pi * 0.7, pi * 1.4, false, glowP);
+    }
 
-    // String
     final stringPaint = Paint()
       ..color = Colors.white.withValues(alpha: 0.85)
       ..strokeWidth = 1.5
@@ -1104,15 +1159,14 @@ class _GamePainter extends CustomPainter {
       ..lineTo(bottomP.dx, bottomP.dy);
     canvas.drawPath(stringPath, stringPaint);
 
-    // Arrow nocked on string
+    // Arrow nocked - tip extends to the bow's edge for correct alignment
     if (drawStrength > 0.1) {
       final arrowPaint = Paint()
-        ..color = bowColors.first.withValues(alpha: 0.9)
+        ..color = arrowColor.withValues(alpha: 0.9)
         ..strokeWidth = 2.5
         ..strokeCap = StrokeCap.round;
       canvas.drawLine(midP, Offset(bowR * 0.9, 0), arrowPaint);
 
-      // Arrow tip
       final tipPaint = Paint()
         ..color = Colors.white
         ..style = PaintingStyle.fill;
@@ -1126,7 +1180,6 @@ class _GamePainter extends CustomPainter {
 
     canvas.restore();
 
-    // Draw strength meter arc behind bow
     if (drawStrength > 0) {
       final meterPaint = Paint()
         ..style = PaintingStyle.stroke
@@ -1147,8 +1200,11 @@ class _GamePainter extends CustomPainter {
   void _drawAimLine(Canvas canvas, Size size) {
     if (drawStrength < 0.1) return;
 
-    // Dotted trajectory prediction
     final speed = 6.0 + drawStrength * 10.0;
+    final launchPt = Offset(
+      bowPosition.dx + cos(bowAngle) * 35.0 * 0.9,
+      bowPosition.dy + sin(bowAngle) * 35.0 * 0.9,
+    );
     final dx = aimPoint.dx - bowPosition.dx;
     final dy = aimPoint.dy - bowPosition.dy;
     final dist = sqrt(dx * dx + dy * dy);
@@ -1158,8 +1214,8 @@ class _GamePainter extends CustomPainter {
     final vy = (dy / dist) * speed;
 
     final dotPaint = Paint()..style = PaintingStyle.fill;
-    var px = bowPosition.dx;
-    var py = bowPosition.dy;
+    var px = launchPt.dx;
+    var py = launchPt.dy;
     var avx = vx;
     var avy = vy;
     const dt = 1.0 / 60.0;
@@ -1187,16 +1243,13 @@ class _GamePainter extends CustomPainter {
       ..strokeWidth = 1.5
       ..style = PaintingStyle.stroke;
 
-    // Outer ring
     canvas.drawCircle(p, r, paint);
 
-    // Cross
     canvas.drawLine(Offset(p.dx - r * 1.4, p.dy), Offset(p.dx - r * 0.4, p.dy), paint);
     canvas.drawLine(Offset(p.dx + r * 0.4, p.dy), Offset(p.dx + r * 1.4, p.dy), paint);
     canvas.drawLine(Offset(p.dx, p.dy - r * 1.4), Offset(p.dx, p.dy - r * 0.4), paint);
     canvas.drawLine(Offset(p.dx, p.dy + r * 0.4), Offset(p.dx, p.dy + r * 1.4), paint);
 
-    // Center dot
     final dotPaint = Paint()
       ..color = AppTheme.danger
       ..style = PaintingStyle.fill;

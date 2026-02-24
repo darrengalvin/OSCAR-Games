@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-enum BowRarity { common, uncommon, rare, epic, legendary }
+enum BowRarity { common, uncommon, rare, epic, legendary, mythic }
 
 class Bow {
   final String id;
@@ -9,6 +9,7 @@ class Bow {
   final BowRarity rarity;
   final bool hasMoodMode;
   final int diamondPrice;
+  final bool hasPauseAbility;
 
   const Bow({
     required this.id,
@@ -17,6 +18,7 @@ class Bow {
     this.rarity = BowRarity.common,
     this.hasMoodMode = false,
     this.diamondPrice = 0,
+    this.hasPauseAbility = false,
   });
 
   Color get primaryColor => colors.first;
@@ -29,6 +31,14 @@ class Bow {
   );
 
   static const List<Bow> allBows = [
+    Bow(
+      id: 'dark_shadow',
+      name: 'Dark Shadow Bow',
+      colors: [Color(0xFF1A1A2E), Color(0xFF16213E), Color(0xFF0F3460)],
+      rarity: BowRarity.mythic,
+      hasPauseAbility: true,
+      diamondPrice: 1000,
+    ),
     Bow(
       id: 'rainbow',
       name: 'Rainbow Bow',
@@ -122,6 +132,8 @@ class Bow {
         return const Color(0xFF9F7AEA);
       case BowRarity.legendary:
         return const Color(0xFFECC94B);
+      case BowRarity.mythic:
+        return const Color(0xFFFF0040);
     }
   }
 
@@ -137,8 +149,65 @@ class Bow {
         return 'Epic';
       case BowRarity.legendary:
         return 'Legendary';
+      case BowRarity.mythic:
+        return 'MYTHIC';
     }
   }
+}
+
+class ArrowSkin {
+  final String id;
+  final String name;
+  final Color color;
+  final Color trailColor;
+  final int diamondPrice;
+
+  const ArrowSkin({
+    required this.id,
+    required this.name,
+    required this.color,
+    required this.trailColor,
+    this.diamondPrice = 20,
+  });
+
+  static const ArrowSkin defaultArrow = ArrowSkin(
+    id: 'default',
+    name: 'Basic Arrow',
+    color: Color(0xFF8B4513),
+    trailColor: Color(0xFF8B4513),
+    diamondPrice: 0,
+  );
+
+  static const List<ArrowSkin> allArrows = [
+    ArrowSkin(
+      id: 'rainbow_arrow',
+      name: 'Rainbow Arrow',
+      color: Color(0xFFFF0000),
+      trailColor: Color(0xFFFF7F00),
+      diamondPrice: 20,
+    ),
+    ArrowSkin(
+      id: 'blue_arrow',
+      name: 'Blue Arrow',
+      color: Color(0xFF4299E1),
+      trailColor: Color(0xFF0BC5EA),
+      diamondPrice: 20,
+    ),
+    ArrowSkin(
+      id: 'diamond_arrow',
+      name: 'Diamond Arrow',
+      color: Color(0xFF00FFFF),
+      trailColor: Color(0xFFB9F2FF),
+      diamondPrice: 20,
+    ),
+    ArrowSkin(
+      id: 'dark_shadow_arrow',
+      name: 'Dark Shadow Arrow',
+      color: Color(0xFF1A1A2E),
+      trailColor: Color(0xFF0F3460),
+      diamondPrice: 20,
+    ),
+  ];
 }
 
 class MoodMode {

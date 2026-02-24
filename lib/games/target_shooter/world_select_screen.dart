@@ -263,7 +263,7 @@ class _WorldSelectScreenState extends State<WorldSelectScreen>
 
   Widget _buildWorldCard(GameWorld world) {
     final currentLevel = playerData.currentLevel(world.id);
-    final progress = currentLevel / 20;
+    final progress = currentLevel / PlayerData.maxLevel;
 
     return GestureDetector(
       onTap: () => _openWorld(world),
@@ -344,6 +344,24 @@ class _WorldSelectScreenState extends State<WorldSelectScreen>
                                 ),
                               ),
                             ],
+                            if (world.diamondMultiplier > 1) ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.warning
+                                      .withValues(alpha: 0.3),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  '💎 x${world.diamondMultiplier}',
+                                  style: const TextStyle(fontSize: 9),
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                         const SizedBox(height: 4),
@@ -369,7 +387,7 @@ class _WorldSelectScreenState extends State<WorldSelectScreen>
               Row(
                 children: [
                   Text(
-                    'Level $currentLevel/20',
+                    'Level $currentLevel/${PlayerData.maxLevel}',
                     style: TextStyle(
                       color: world.primaryColor,
                       fontSize: 12,

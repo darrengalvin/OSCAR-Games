@@ -10,6 +10,7 @@ class GameWorld {
   final Color backgroundColor;
   final Color targetColor;
   final bool isNight;
+  final int diamondMultiplier;
 
   const GameWorld({
     required this.id,
@@ -21,7 +22,10 @@ class GameWorld {
     required this.backgroundColor,
     required this.targetColor,
     this.isNight = false,
+    this.diamondMultiplier = 1,
   });
+
+  int get diamondsPerLevel => 5 * diamondMultiplier;
 
   static const List<GameWorld> worlds = [
     GameWorld(
@@ -54,6 +58,18 @@ class GameWorld {
       secondaryColor: Color(0xFF8B7D3C),
       backgroundColor: Color(0xFF3D3520),
       targetColor: Color(0xFFFF4444),
+    ),
+    GameWorld(
+      id: 'bedroom',
+      name: 'The Bedroom',
+      description: 'Your cosy bedroom at night. Double diamonds in here!',
+      icon: Icons.bed_rounded,
+      primaryColor: Color(0xFF6C63FF),
+      secondaryColor: Color(0xFF3F37C9),
+      backgroundColor: Color(0xFF1A1333),
+      targetColor: Color(0xFFFFD166),
+      isNight: true,
+      diamondMultiplier: 2,
     ),
   ];
 }

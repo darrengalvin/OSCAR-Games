@@ -20,6 +20,8 @@ class WorldBackgroundPainter extends CustomPainter {
         _paintJupiter(canvas, size);
       case 'backrooms':
         _paintBackrooms(canvas, size);
+      case 'bedroom':
+        _paintBedroom(canvas, size);
     }
   }
 
@@ -213,6 +215,169 @@ class WorldBackgroundPainter extends CustomPainter {
     canvas.drawRect(
       Rect.fromLTWH(0, size.height * 0.9, size.width, size.height * 0.1),
       floorPaint,
+    );
+  }
+
+  void _paintBedroom(Canvas canvas, Size size) {
+    final bgPaint = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [
+          const Color(0xFF1A1333),
+          const Color(0xFF221B44),
+          const Color(0xFF15102A),
+        ],
+      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
+    canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height), bgPaint);
+
+    // Window with moonlight
+    final windowPaint = Paint()
+      ..color = const Color(0xFF2A2555).withValues(alpha: 0.6);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromCenter(
+          center: Offset(size.width * 0.75, size.height * 0.2),
+          width: 80,
+          height: 100,
+        ),
+        const Radius.circular(4),
+      ),
+      windowPaint,
+    );
+    final glassPaint = Paint()
+      ..color = const Color(0xFF3B3580).withValues(alpha: 0.4);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromCenter(
+          center: Offset(size.width * 0.75, size.height * 0.2),
+          width: 72,
+          height: 92,
+        ),
+        const Radius.circular(2),
+      ),
+      glassPaint,
+    );
+    // Window panes
+    final panePaint = Paint()
+      ..color = const Color(0xFF2A2555)
+      ..strokeWidth = 2;
+    canvas.drawLine(
+      Offset(size.width * 0.75, size.height * 0.2 - 46),
+      Offset(size.width * 0.75, size.height * 0.2 + 46),
+      panePaint,
+    );
+    canvas.drawLine(
+      Offset(size.width * 0.75 - 36, size.height * 0.2),
+      Offset(size.width * 0.75 + 36, size.height * 0.2),
+      panePaint,
+    );
+
+    // Moonlight glow from window
+    final moonGlow = Paint()
+      ..color = const Color(0xFF6C63FF).withValues(alpha: 0.04)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 60);
+    canvas.drawCircle(
+      Offset(size.width * 0.75, size.height * 0.2),
+      120,
+      moonGlow,
+    );
+
+    // Stars through window
+    final starPaint = Paint();
+    final random = Random(99);
+    for (int i = 0; i < 8; i++) {
+      starPaint.color = Colors.white.withValues(
+        alpha: 0.3 + random.nextDouble() * 0.5,
+      );
+      canvas.drawCircle(
+        Offset(
+          size.width * 0.75 - 30 + random.nextDouble() * 60,
+          size.height * 0.2 - 40 + random.nextDouble() * 80,
+        ),
+        random.nextDouble() * 1.5 + 0.3,
+        starPaint,
+      );
+    }
+
+    // Bed silhouette at bottom
+    final bedPaint = Paint()..color = const Color(0xFF100D20);
+    final bedPath = Path()
+      ..moveTo(size.width * 0.05, size.height * 0.88)
+      ..lineTo(size.width * 0.05, size.height * 0.82)
+      ..quadraticBezierTo(
+        size.width * 0.08, size.height * 0.78,
+        size.width * 0.15, size.height * 0.78,
+      )
+      ..lineTo(size.width * 0.55, size.height * 0.78)
+      ..lineTo(size.width * 0.55, size.height * 0.85)
+      ..lineTo(size.width * 0.55, size.height * 0.88)
+      ..close();
+    canvas.drawPath(bedPath, bedPaint);
+
+    // Pillow
+    final pillowPaint = Paint()..color = const Color(0xFF1E1840);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(
+          size.width * 0.07,
+          size.height * 0.78,
+          size.width * 0.12,
+          size.height * 0.05,
+        ),
+        const Radius.circular(6),
+      ),
+      pillowPaint,
+    );
+
+    // Bedside table
+    final tablePaint = Paint()..color = const Color(0xFF0D0A1A);
+    canvas.drawRect(
+      Rect.fromLTWH(
+        size.width * 0.6,
+        size.height * 0.80,
+        size.width * 0.1,
+        size.height * 0.08,
+      ),
+      tablePaint,
+    );
+
+    // Lamp on table
+    final lampPaint = Paint()..color = const Color(0xFFFFD166).withValues(alpha: 0.15);
+    canvas.drawCircle(
+      Offset(size.width * 0.65, size.height * 0.78),
+      12,
+      lampPaint,
+    );
+    final lampGlow = Paint()
+      ..color = const Color(0xFFFFD166).withValues(alpha: 0.03)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 30);
+    canvas.drawCircle(
+      Offset(size.width * 0.65, size.height * 0.78),
+      50,
+      lampGlow,
+    );
+
+    // Floor
+    final floorPaint = Paint()..color = const Color(0xFF0D0A1A);
+    canvas.drawRect(
+      Rect.fromLTWH(0, size.height * 0.88, size.width, size.height * 0.12),
+      floorPaint,
+    );
+
+    // x2 Diamond badge
+    final badgePaint = Paint()
+      ..color = const Color(0xFFFFD166).withValues(alpha: 0.08);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromCenter(
+          center: Offset(size.width * 0.15, size.height * 0.06),
+          width: 60,
+          height: 24,
+        ),
+        const Radius.circular(12),
+      ),
+      badgePaint,
     );
   }
 

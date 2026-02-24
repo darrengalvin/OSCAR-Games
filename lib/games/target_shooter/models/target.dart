@@ -10,7 +10,6 @@ class ShootingTarget {
   final int points;
   final MovePattern pattern;
 
-  // Movement state
   double _moveAngle;
   double _speed;
   double _time;
@@ -18,6 +17,8 @@ class ShootingTarget {
   final double _orbitRadius;
   double _zigzagTimer;
   final double _zigzagInterval;
+  bool isPaused;
+  double _pauseTimer;
 
   ShootingTarget({
     required this.position,
@@ -35,14 +36,30 @@ class ShootingTarget {
         _origin = position,
         _orbitRadius = orbitRadius,
         _zigzagTimer = 0,
-        _zigzagInterval = zigzagInterval;
+        _zigzagInterval = zigzagInterval,
+        isPaused = false,
+        _pauseTimer = 0;
 
   bool containsPoint(Offset point) {
     return (point - position).distance <= radius;
   }
 
+  void pauseFor(double seconds) {
+    isPaused = true;
+    _pauseTimer = seconds;
+  }
+
   void update(double dt, Size bounds) {
     if (isHit) return;
+
+    if (isPaused) {
+      _pauseTimer -= dt;
+      if (_pauseTimer <= 0) {
+        isPaused = false;
+      }
+      return;
+    }
+
     _time += dt;
 
     switch (pattern) {
@@ -119,19 +136,29 @@ class ShootingTarget {
     final random = Random();
     final targets = <ShootingTarget>[];
 
-    // Targets shrink with level: 28px at level 1 -> 13px at level 20
-    final targetRadius = (28.0 - (level - 1) * 0.8).clamp(13.0, 28.0);
+    // Levels 1-50: targets shrink gradually
+    // Level 1 = 30px, level 50 = 10px
+    final targetRadius = (30.0 - (level - 1) * 0.41).clamp(10.0, 30.0);
 
-    // Speed ramps up
-    final baseSpeed = (0.8 + level * 0.2).clamp(0.8, 4.5);
+    // Speed ramps up more gradually over 50 levels
+    // Level 1 = 0.4, level 10 = 1.2, level 50 = 5.0
+    final baseSpeed = level <= 5
+        ? 0.4 + (level - 1) * 0.15
+        : level <= 15
+            ? 0.8 + (level - 5) * 0.12
+            : level <= 30
+                ? 2.0 + (level - 15) * 0.15
+                : 4.0 + (level - 30) * 0.05;
 
-    // Available patterns expand with level
+    // Movement patterns unlock gradually
     final patterns = <MovePattern>[];
-    if (level <= 2) {
+    if (level <= 3) {
+      patterns.add(MovePattern.stationary);
+    } else if (level <= 8) {
       patterns.addAll([MovePattern.stationary, MovePattern.linear]);
-    } else if (level <= 6) {
+    } else if (level <= 15) {
       patterns.addAll([MovePattern.linear, MovePattern.zigzag]);
-    } else if (level <= 12) {
+    } else if (level <= 30) {
       patterns.addAll([
         MovePattern.linear,
         MovePattern.zigzag,
@@ -145,7 +172,6 @@ class ShootingTarget {
       ]);
     }
 
-    // Keep targets in the upper 75% of the area (bow is at bottom)
     final spawnHeight = areaSize.height * 0.75;
 
     for (int i = 0; i < count; i++) {
@@ -161,7 +187,7 @@ class ShootingTarget {
         position: Offset(x, y),
         radius: targetRadius,
         pattern: pattern,
-        speed: baseSpeed + random.nextDouble() * 1.0,
+        speed: baseSpeed + random.nextDouble() * 0.5,
         moveAngle: angle,
         orbitRadius: orbitR,
         zigzagInterval: 0.8 + random.nextDouble() * 1.5,
