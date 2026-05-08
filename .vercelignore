@@ -1,0 +1,8 @@
+# Shrink CLI uploads — the web build is produced on Vercel.
+android/
+ios/
+windows/
+linux/
+macos/
+build/
+.dart_tool/

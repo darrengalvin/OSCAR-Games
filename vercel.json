@@ -1,6 +1,5 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "name": "oscar-games",
   "buildCommand": "bash scripts/vercel-build.sh",
   "outputDirectory": "build/web",
   "installCommand": "echo 'Flutter bootstraps in buildCommand'",
