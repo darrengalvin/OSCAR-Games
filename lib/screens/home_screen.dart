@@ -8,6 +8,7 @@ import '../games/memory_match/memory_match_screen.dart';
 import '../games/snake/snake_screen.dart';
 import '../games/reaction/reaction_screen.dart';
 import '../games/target_shooter/world_select_screen.dart';
+import '../games/boat_fishing/boat_fishing_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -79,6 +80,18 @@ class _HomeScreenState extends State<HomeScreen>
       screenBuilder: () => const WorldSelectScreen(),
       difficulty: 'Hard',
     ),
+    GameInfo(
+      id: 'boat_fishing',
+      title: 'Lucky Fish',
+      subtitle: 'Cast, sell, upgrade',
+      description:
+          'In Lucky Fish, cast from your boat, sell catches for fish coins, and buy rods and hulls — rarer bites await!',
+      icon: Icons.phishing_rounded,
+      color: AppTheme.blue,
+      secondaryColor: AppTheme.accent,
+      screenBuilder: () => const BoatFishingScreen(),
+      difficulty: 'Relax',
+    ),
   ];
 
   @override
@@ -117,6 +130,9 @@ class _HomeScreenState extends State<HomeScreen>
       case 'target_shooter':
         final s = save.totalLevelsCompleted;
         return s > 0 ? s : null;
+      case 'boat_fishing':
+        final c = save.fishCoins;
+        return c > 0 ? c : null;
       default:
         return null;
     }

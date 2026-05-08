@@ -141,4 +141,71 @@ class SaveService {
 
   int? get reactionBest => _prefs.getInt('reaction_best');
   int get reactionGamesPlayed => _prefs.getInt('reaction_played') ?? 0;
+
+  // --- Lucky Fish (boat_fishing prefs) ---
+
+  static const String _fishCoinsKey = 'fish_coins';
+  static const String _fishingBoatsKey = 'fishing_boats_owned';
+  static const String _fishingRodsKey = 'fishing_rods_owned';
+  static const String _fishingBoatEquippedKey = 'fishing_boat_equipped';
+  static const String _fishingRodEquippedKey = 'fishing_rod_equipped';
+  static const String _fishingInventoryKey = 'fishing_inventory';
+  static const String _fishingTotalCaughtKey = 'fishing_total_caught';
+  static const String _fishingRedeemedCodesKey = 'fishing_redeemed_codes';
+
+  int get fishCoins => _prefs.getInt(_fishCoinsKey) ?? 0;
+
+  Future<void> setFishCoins(int value) async {
+    await _prefs.setInt(_fishCoinsKey, value.clamp(0, 1 << 30));
+  }
+
+  List<String> get fishingOwnedBoats =>
+      _prefs.getStringList(_fishingBoatsKey) ?? const ['dinghy'];
+
+  List<String> get fishingOwnedRods =>
+      _prefs.getStringList(_fishingRodsKey) ?? const ['bamboo'];
+
+  String get fishingEquippedBoatId =>
+      _prefs.getString(_fishingBoatEquippedKey) ?? 'dinghy';
+
+  String get fishingEquippedRodId =>
+      _prefs.getString(_fishingRodEquippedKey) ?? 'bamboo';
+
+  int get fishingTotalCaught => _prefs.getInt(_fishingTotalCaughtKey) ?? 0;
+
+  Future<void> saveFishingProgress({
+    required int fishCoins,
+    required List<String> ownedBoats,
+    required List<String> ownedRods,
+    required String equippedBoatId,
+    required String equippedRodId,
+    required Map<String, int> inventory,
+    required int totalCaught,
+  }) async {
+    await _prefs.setInt(_fishCoinsKey, fishCoins);
+    await _prefs.setStringList(_fishingBoatsKey, ownedBoats);
+    await _prefs.setStringList(_fishingRodsKey, ownedRods);
+    await _prefs.setString(_fishingBoatEquippedKey, equippedBoatId);
+    await _prefs.setString(_fishingRodEquippedKey, equippedRodId);
+    await _prefs.setString(_fishingInventoryKey, jsonEncode(inventory));
+    await _prefs.setInt(_fishingTotalCaughtKey, totalCaught);
+  }
+
+  Map<String, int> get fishingInventory {
+    final raw = _prefs.getString(_fishingInventoryKey);
+    if (raw == null || raw.isEmpty) return {};
+    try {
+      final decoded = jsonDecode(raw) as Map<String, dynamic>;
+      return decoded.map((k, v) => MapEntry(k, v as int));
+    } catch (_) {
+      return {};
+    }
+  }
+
+  List<String> get fishingRedeemedCodes =>
+      _prefs.getStringList(_fishingRedeemedCodesKey) ?? const [];
+
+  Future<void> saveFishingRedeemedCodes(List<String> codes) async {
+    await _prefs.setStringList(_fishingRedeemedCodesKey, codes);
+  }
 }
