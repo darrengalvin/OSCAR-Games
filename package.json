@@ -1,0 +1,8 @@
+{
+  "name": "oscar-games",
+  "private": true,
+  "description": "OSCAR Games — Flutter app (deploy web build to Vercel)",
+  "scripts": {
+    "build": "bash scripts/vercel-build.sh"
+  }
+}
