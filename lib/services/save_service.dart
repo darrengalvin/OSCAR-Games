@@ -208,4 +208,64 @@ class SaveService {
   Future<void> saveFishingRedeemedCodes(List<String> codes) async {
     await _prefs.setStringList(_fishingRedeemedCodesKey, codes);
   }
+
+  // --- World Cup ---
+
+  static const String _worldCupTournamentsKey = 'world_cup_tournaments_started';
+  static const String _worldCupWinsKey = 'world_cup_wins';
+  static const String _worldCupActiveRunKey = 'world_cup_active_run';
+
+  int get worldCupTournamentsStarted =>
+      _prefs.getInt(_worldCupTournamentsKey) ?? 0;
+
+  int get worldCupWins => _prefs.getInt(_worldCupWinsKey) ?? 0;
+
+  String? get worldCupActiveRunJson => _prefs.getString(_worldCupActiveRunKey);
+
+  Future<void> saveWorldCupProgress({
+    required int tournamentsStarted,
+    required int wins,
+    String? activeRunJson,
+    int? coins,
+    List<String>? ownedNationIds,
+  }) async {
+    await _prefs.setInt(_worldCupTournamentsKey, tournamentsStarted);
+    await _prefs.setInt(_worldCupWinsKey, wins);
+    if (activeRunJson == null) {
+      await _prefs.remove(_worldCupActiveRunKey);
+    } else {
+      await _prefs.setString(_worldCupActiveRunKey, activeRunJson);
+    }
+    if (coins != null) {
+      await _prefs.setInt(_worldCupCoinsKey, coins.clamp(0, 999999));
+    }
+    if (ownedNationIds != null) {
+      await _prefs.setStringList(_worldCupOwnedNationsKey, ownedNationIds);
+    }
+  }
+
+  static const String _worldCupCoinsKey = 'world_cup_coins';
+  static const String _worldCupOwnedNationsKey = 'world_cup_owned_nations';
+
+  int get worldCupCoins => _prefs.getInt(_worldCupCoinsKey) ?? 0;
+
+  List<String> get worldCupOwnedNationIds {
+    final stored = _prefs.getStringList(_worldCupOwnedNationsKey);
+    if (stored == null || stored.isEmpty) {
+      return const ['jpn', 'alg', 'aut'];
+    }
+    return stored;
+  }
+
+  Future<void> ensureWorldCupDefaults() async {
+    if (!_prefs.containsKey(_worldCupOwnedNationsKey)) {
+      await _prefs.setStringList(_worldCupOwnedNationsKey, const ['jpn', 'alg', 'aut']);
+      return;
+    }
+    final stored = List<String>.from(_prefs.getStringList(_worldCupOwnedNationsKey) ?? []);
+    if (!stored.contains('jpn')) {
+      stored.insert(0, 'jpn');
+      await _prefs.setStringList(_worldCupOwnedNationsKey, stored);
+    }
+  }
 }

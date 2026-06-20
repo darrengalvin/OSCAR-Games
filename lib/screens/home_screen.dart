@@ -9,6 +9,7 @@ import '../games/snake/snake_screen.dart';
 import '../games/reaction/reaction_screen.dart';
 import '../games/target_shooter/world_select_screen.dart';
 import '../games/boat_fishing/boat_fishing_screen.dart';
+import '../games/world_cup/world_cup_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -23,6 +24,31 @@ class _HomeScreenState extends State<HomeScreen>
   late Animation<double> _titleAnimation;
 
   late final List<GameInfo> games = [
+    GameInfo(
+      id: 'world_cup',
+      title: 'World Cup',
+      subtitle: '2026 World Cup · 48 nations',
+      description:
+          'The 48 nations that qualified for the 2026 FIFA World Cup — '
+          'Groups A–L, group stage through the Final. Play or quick-play matches.',
+      icon: Icons.sports_soccer_rounded,
+      color: AppTheme.success,
+      secondaryColor: AppTheme.warning,
+      screenBuilder: () => const WorldCupScreen(),
+      difficulty: 'Medium',
+    ),
+    GameInfo(
+      id: 'boat_fishing',
+      title: 'Lucky Fish',
+      subtitle: 'Cast, sell, upgrade',
+      description:
+          'In Lucky Fish, cast from your boat, sell catches for fish coins, and buy rods and hulls — rarer bites await!',
+      icon: Icons.phishing_rounded,
+      color: AppTheme.blue,
+      secondaryColor: AppTheme.accent,
+      screenBuilder: () => const BoatFishingScreen(),
+      difficulty: 'Relax',
+    ),
     GameInfo(
       id: 'tic_tac_toe',
       title: 'Tic Tac Toe',
@@ -80,18 +106,6 @@ class _HomeScreenState extends State<HomeScreen>
       screenBuilder: () => const WorldSelectScreen(),
       difficulty: 'Hard',
     ),
-    GameInfo(
-      id: 'boat_fishing',
-      title: 'Lucky Fish',
-      subtitle: 'Cast, sell, upgrade',
-      description:
-          'In Lucky Fish, cast from your boat, sell catches for fish coins, and buy rods and hulls — rarer bites await!',
-      icon: Icons.phishing_rounded,
-      color: AppTheme.blue,
-      secondaryColor: AppTheme.accent,
-      screenBuilder: () => const BoatFishingScreen(),
-      difficulty: 'Relax',
-    ),
   ];
 
   @override
@@ -133,6 +147,9 @@ class _HomeScreenState extends State<HomeScreen>
       case 'boat_fishing':
         final c = save.fishCoins;
         return c > 0 ? c : null;
+      case 'world_cup':
+        final w = save.worldCupWins;
+        return w > 0 ? w : null;
       default:
         return null;
     }
