@@ -10,6 +10,7 @@ import '../games/reaction/reaction_screen.dart';
 import '../games/target_shooter/world_select_screen.dart';
 import '../games/boat_fishing/boat_fishing_screen.dart';
 import '../games/world_cup/world_cup_screen.dart';
+import '../games/board_game/board_game_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -24,6 +25,21 @@ class _HomeScreenState extends State<HomeScreen>
   late Animation<double> _titleAnimation;
 
   late final List<GameInfo> games = [
+    GameInfo(
+      id: 'board_game',
+      title: 'Lucky Board Game',
+      subtitle: 'Dice race to the middle',
+      description:
+          'Pick 1–5 players, enter names, then race around nested squares. '
+          'First into the middle wins!',
+      icon: Icons.casino_rounded,
+      color: AppTheme.accent,
+      secondaryColor: AppTheme.warning,
+      screenBuilder: () => const BoardGameScreen(),
+      minPlayers: 1,
+      maxPlayers: 5,
+      difficulty: 'Easy',
+    ),
     GameInfo(
       id: 'world_cup',
       title: 'World Cup',
